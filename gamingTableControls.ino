@@ -18,7 +18,7 @@
 #define LED_PIN 13
 #define COLOR_ORDER GRB
 #define CHIPSET WS2812B
-#define NUM_LEDS 132
+#define NUM_LEDS 117
 
 #define BRIGHTNESS 200
 #define FRAMES_PER_SECOND 30
@@ -28,19 +28,19 @@ bool gReverseDirection = false;
 CRGB leds[NUM_LEDS];
 
 const int SEATS = 8;
-int highlightCenter = 0;
-int highlightSpread = 3;
 
-int centerPixels[SEATS] = { 11, 22, 33, 53, 77, 88, 99 };  //{10,30,50,70,90,110,130,150};
-int startSeat[SEATS] = { 10, 20, 30, 50, 70, 90, 100 };
-int sizeSeat[SEATS] = { 10, 20, 30, 50, 70, 90, 100 };
+int seatStart[SEATS] = { 37, 9, 14, 18, 24, 29, 34, 34 };
+int seatSize[SEATS] = { 3, 5, 4, 6, 5, 5, 3, 6 };
 
-CRGB highlightCLR = CRGB::Blue;
+const int COLORS = 6;
+int selectedColor = 0;
+CRGB colors[COLORS] = {CRGB::Blue, CRGB::Red, CRGB::Green, CRGB::White, CRGB::Yellow, CRGB::Purple};
+CRGB highlightCLR = colors[selectedColor];
 
 CRGBPalette16 gPal;
 
 //-------------------------------------
-//keypad setup
+// keypad setup
 //-------------------------------------
 const byte ROWS = 4;  // rows
 const byte COLS = 4;  // columns
@@ -88,7 +88,7 @@ void loop() {
   highlightPlayer();
 
   // run current animations
-  // handleAnimations();
+  handleAnimations();
 
   FastLED.show();
   FastLED.delay(1000 / FRAMES_PER_SECOND);
@@ -116,6 +116,7 @@ void handleKeyPress()
       case '0':
         isRunningAnimation = selectedPlayer = 0;
         runningAnimation = '\0';
+        highlightCLR = colors[selectedColor];
         FastLED.clear();
         FastLED.show();
         break;
@@ -129,6 +130,7 @@ void handleKeyPress()
       case '7':
       case '8':
         // case '9':
+        highlightCLR = colors[selectedColor];
         selectedPlayer = keypressed - '0';
         Serial.print("selectedPlayer ");
         Serial.println(selectedPlayer);
@@ -163,8 +165,16 @@ void handleKeyPress()
         }
         Serial.print("selectedPlayer ");
         Serial.println(selectedPlayer);
+        // clear old selected player
+        FastLED.clear();
+        FastLED.show();
         break;
       case '#':
+        selectedColor += 1;
+        if (selectedColor >= COLORS) {
+          selectedColor = 0;
+        }
+        highlightCLR = colors[selectedColor];
         break;
       }
     }
@@ -282,14 +292,10 @@ void Fireplace() {
 
 void highlightPlayer() {
   if (selectedPlayer != 0) {
-    highlightCenter = centerPixels[selectedPlayer - 1];
-    int k = highlightCenter - highlightSpread;
-    int m = k + highlightSpread * 2 + 1;
-    // Serial.print("highlightCenter = ");
-    // Serial.println(highlightCenter);
-    // Serial.print("highlightSize = ");
-    // Serial.println(m);
-    for (int j = k; j < m; j++) {
+    int startLed = seatStart[selectedPlayer - 1];
+    int size = seatSize[selectedPlayer - 1];
+    for (int j = startLed; j < (startLed + size); j++)
+    {
       leds[j] = highlightCLR;
     }
   }
