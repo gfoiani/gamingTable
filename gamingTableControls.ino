@@ -31,10 +31,14 @@ const int SEATS = 8;
 int highlightCenter = 0;
 int highlightSpread = 3;
 
-int centerPixels[SEATS] = { 11, 22, 33, 53, 77, 88, 99, 118 };  //{10,30,50,70,90,110,130,150};
+int centerPixels[SEATS] = { 11, 22, 33, 53, 77, 88, 99 };  //{10,30,50,70,90,110,130,150};
+int startSeat[SEATS] = { 10, 20, 30, 50, 70, 90, 100 };
+int sizeSeat[SEATS] = { 10, 20, 30, 50, 70, 90, 100 };
+
 CRGB highlightCLR = CRGB::Blue;
 
 CRGBPalette16 gPal;
+
 //-------------------------------------
 //keypad setup
 //-------------------------------------
@@ -56,212 +60,146 @@ byte colPins[COLS] = { 6, 7, 8, 9 };  //connect to the column pinouts of the key
 //initialize an instance of class NewKeypad
 Adafruit_Keypad customKeypad = Adafruit_Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
-int pendingPlayerCode;
-int runningAnimation = 0;  //(1-4)
-                           //-------------------------------------
-                           //button setup
-                           //-------------------------------------
-
-const int BUTTON_NUM = 5;
-
-const int BUTTON_1_PIN = 2;
-const int BUTTON_2_PIN = 3;
-const int BUTTON_3_PIN = 4;
-const int BUTTON_4_PIN = 5;
-const int BUTTON_5_PIN = 6;
-const int BUTTON_6_PIN = 7;
-const int BUTTON_7_PIN = 8;
-const int BUTTON_8_PIN = 9;
-
-ezButton buttonArray[] = {
-  ezButton(BUTTON_1_PIN),
-  ezButton(BUTTON_2_PIN),
-  ezButton(BUTTON_3_PIN),
-  ezButton(BUTTON_4_PIN),
-  ezButton(BUTTON_5_PIN),
-  ezButton(BUTTON_6_PIN),
-  ezButton(BUTTON_7_PIN),
-  ezButton(BUTTON_8_PIN)
-};
-
-int gameMode = 0;
-/*
-0 = DM control only
-1 = player advance control
-
-*/
-
+int selectedPlayer = 0;
+int isRunningAnimation = 0;  
+char runningAnimation = '\0'; //(A-D)
 
 void setup() {
-  delay(3000);  // sanity delay
+  delay(1000);  // sanity delay
   FastLED.addLeds<CHIPSET, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
   FastLED.clear();
   FastLED.show();
 
   Serial.begin(9600);
+
   customKeypad.begin();
-  for (byte i = 0; i < BUTTON_NUM; i++) {
-    buttonArray[i].setDebounceTime(50);  // set debounce time to 50 milliseconds
-  }
-  Serial.println("annnnnnnd GO!");
+
+  Serial.println("Setup completed!");
 }
 
 void loop() {
   random16_add_entropy(random());
-  //run current animations
-  switch (runningAnimation) {
-    case 0:
-      FastLED.clear();
-      //highlightCLR = CRGB::Blue;
-      break;
-    case 1:
-      lightning();
-      break;
-    case 2:
-      gPal = HeatColors_p;
-      Fireplace();
-      highlightCLR = CRGB::Blue;
-      break;
-    case 3:
-      gPal = CRGBPalette16(CRGB::Black, CRGB::Blue, CRGB::White, CRGB::Green);
-      Fireplace();
-      highlightCLR = CRGB::Red;
-      break;
-    case 4:
-      gPal = CRGBPalette16(CRGB::Black, CRGB::DarkGreen, CRGB::Black, CRGB::Yellow);
-      Fireplace();
-      highlightCLR = CRGB::White;
-      break;
-  }
 
-  //handle selected player
+  // handle key press
+  handleKeyPress();
+
+  // handle selected player
   highlightPlayer();
+
+  // run current animations
+  // handleAnimations();
 
   FastLED.show();
   FastLED.delay(1000 / FRAMES_PER_SECOND);
 
+  delay(10);
+}
 
-  //check keypad
+// KEYPRESSED
+void handleKeyPress()
+{
+  // check keypad
   customKeypad.tick();
 
-  while (customKeypad.available()) {
+  while (customKeypad.available())
+  {
     keypadEvent e = customKeypad.read();
     char keypressed = (char)e.bit.KEY;
-    if (e.bit.EVENT == KEY_JUST_PRESSED) {
+    if (e.bit.EVENT == KEY_JUST_PRESSED)
+    {
       Serial.print("keypressed ");
       Serial.println(keypressed);
-      switch (keypressed) {
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-          //case '9':
-          pendingPlayerCode = keypressed - '0';
-          //clear old selected player
+      switch (keypressed)
+      {
+      // clear all lights
+      case '0':
+        isRunningAnimation = selectedPlayer = 0;
+        runningAnimation = '\0';
+        FastLED.clear();
+        FastLED.show();
+        break;
+      // players
+      case '1':
+      case '2':
+      case '3':
+      case '4':
+      case '5':
+      case '6':
+      case '7':
+      case '8':
+        // case '9':
+        selectedPlayer = keypressed - '0';
+        Serial.print("selectedPlayer ");
+        Serial.println(selectedPlayer);
+        // clear old selected player
+        FastLED.clear();
+        FastLED.show();
+        break;
+      // animations
+      case 'A':
+      case 'B':
+      case 'C':
+      case 'D':
+        selectedPlayer = 0;
+        if (runningAnimation != keypressed)
+        {
+          isRunningAnimation = 1;
+          runningAnimation = keypressed;
+        }
+        else
+        {
+          isRunningAnimation = 0;
+          runningAnimation = '\0';
           FastLED.clear();
           FastLED.show();
-          Serial.print(keypressed);
-          break;
-        case '0':
-          //clear all lights
-          runningAnimation = pendingPlayerCode = 0;
-          FastLED.clear();
-          FastLED.show();
-          break;
-        //animations
-        case 'A':
-          if (runningAnimation != 1) {
-            runningAnimation = 1;
-          } else {
-            runningAnimation = 0;
-            FastLED.clear();
-            FastLED.show();
-          }
-          break;
-        case 'B':
-          if (runningAnimation != 2) {
-            runningAnimation = 2;
-          } else {
-            runningAnimation = 0;
-            FastLED.clear();
-            FastLED.show();
-          }
-          break;
-        case 'C':
-          if (runningAnimation != 3) {
-            runningAnimation = 3;
-          } else {
-            runningAnimation = 0;
-            FastLED.clear();
-            FastLED.show();
-          }
-          break;
-        case 'D':
-          if (runningAnimation != 4) {
-            runningAnimation = 4;
-          } else {
-            runningAnimation = 0;
-            FastLED.clear();
-            FastLED.show();
-          }
-          break;
-
-        case '*':
-          //install SHIFT
-          break;
-        case '#':
-          //execute player select
-          break;
+        }
+        break;
+      case '*':
+        // execute player select
+        selectedPlayer += 1;
+        if (selectedPlayer > SEATS) {
+          selectedPlayer = 1;
+        }
+        Serial.print("selectedPlayer ");
+        Serial.println(selectedPlayer);
+        break;
+      case '#':
+        break;
       }
     }
-  }
-
-
-  delay(10);
-
-  //check buttons
-  for (byte i = 0; i < BUTTON_NUM; i++)
-    buttonArray[i].loop();  // MUST call the loop() function first
-
-  for (byte i = 0; i < BUTTON_NUM; i++) {
-    if (buttonArray[i].isPressed()) {
-      Serial.print("The button ");
-      Serial.print(i + 1);
-      Serial.println(" is pressed");
-
-      switch (gameMode) {
-
-        case 0:
-          //if the selected player presses their button, clear it
-          if (i == pendingPlayerCode) {
-            pendingPlayerCode = 0;
-          }
-          break;
-        case 1:
-          //advance to next, with loop to beginning
-          pendingPlayerCode++;
-          if (pendingPlayerCode > SEATS) {
-            pendingPlayerCode = 0;
-          }
-          FastLED.clear();
-          FastLED.show();
-          break;
-      }
-    }
-
-    /*if(buttonArray[i].isReleased()) {
-          Serial.print("The button ");
-          Serial.print(i + 1);
-          Serial.println(" is released");
-        }*/
   }
 }
 
+// ANIMATIONS
+
+void handleAnimations()
+{
+  if (isRunningAnimation)
+  {
+    switch (runningAnimation)
+    {
+    case 'A':
+      lightning();
+      break;
+    case 'B':
+      gPal = HeatColors_p;
+      Fireplace();
+      highlightCLR = CRGB::Blue;
+      break;
+    case 'C':
+      gPal = CRGBPalette16(CRGB::Black, CRGB::Blue, CRGB::White, CRGB::Green);
+      Fireplace();
+      highlightCLR = CRGB::Red;
+      break;
+    case 'D':
+      gPal = CRGBPalette16(CRGB::Black, CRGB::DarkGreen, CRGB::Black, CRGB::Yellow);
+      Fireplace();
+      highlightCLR = CRGB::White;
+      break;
+    }
+  }
+}
 
 #define FLASHES 8
 #define FREQUENCY 20  // delay between strikes
@@ -284,8 +222,6 @@ void lightning() {
   highlightPlayer();
 }
 
-
-
 //from https://codebender.cc/sketch:190691
 /* Rate of cooling. Play with to change fire from
    roaring (smaller values) to weak (larger values) 55 */
@@ -295,7 +231,6 @@ void lightning() {
 #define HOT 120
 #define MAXHOT HOT* HEIGHT
 #define HEIGHT 1
-
 
 void Fireplace() {
   static unsigned int spark[NUM_LEDS];  // base heat
@@ -342,16 +277,19 @@ void Fireplace() {
     }
   }
 }
+
+// PLAYERS
+
 void highlightPlayer() {
-  if (pendingPlayerCode != 0) {
-    highlightCenter = centerPixels[pendingPlayerCode - 1];
+  if (selectedPlayer != 0) {
+    highlightCenter = centerPixels[selectedPlayer - 1];
     int k = highlightCenter - highlightSpread;
     int m = k + highlightSpread * 2 + 1;
-    /*Serial.print("highlightCenter=");
-        Serial.println(highlightCenter);
-        //Serial.println(k+"----------"+m);*/
+    // Serial.print("highlightCenter = ");
+    // Serial.println(highlightCenter);
+    // Serial.print("highlightSize = ");
+    // Serial.println(m);
     for (int j = k; j < m; j++) {
-      // Serial.println(j);
       leds[j] = highlightCLR;
     }
   }
